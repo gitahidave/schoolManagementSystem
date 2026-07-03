@@ -1,39 +1,87 @@
-import { useEffect, useState } from 'react'
+import { useMemo, useState } from 'react'
+import { Link } from 'react-router-dom'
+import useStudents from '../hooks/useStudents'
+import { deleteStudent } from '../api/students'
+import StudentCard from './StudentCard'
+import ConfirmModal from './ConfirmModal'
 
 function StudentsList() {
-  const [students, setStudents] = useState([])
-  const [loading, setLoading] = useState(true)
+  const { students, loading, error, reload } = useStudents()
+  const [query, setQuery] = useState('')
+  const [toDelete, setToDelete] = useState(null)
 
-  useEffect(() => {
-    fetch('http://localhost:5000/students')
-      .then((res) => res.json())
-      .then((data) => {
-        setStudents(data)
-        setLoading(false)
-      })
-      .catch(() => setLoading(false))
-  }, [])
+  const filtered = useMemo(() => {
+    const q = query.trim().toLowerCase()
+    if (!q) return students
+    return students.filter((s) =>
+      [s.firstName, s.secondName, s.admissionNumber, s.email, s.course]
+        .join(' ')
+        .toLowerCase()
+        .includes(q),
+    )
+  }, [students, query])
 
-  if (loading) {
-    return <p className="status">Loading students...</p>
+  const handleConfirmDelete = async () => {
+    try {
+      await deleteStudent(toDelete.id)
+      setToDelete(null)
+      reload()
+    } catch (err) {
+      alert(err.message)
+    }
+  }
+
+  if (loading) return <p className="status">Loading students...</p>
+  if (error) {
+    return (
+      <div className="card">
+        <h2>Something went wrong</h2>
+        <p className="status error">{error}</p>
+        <button className="btn" onClick={reload}>Retry</button>
+      </div>
+    )
   }
 
   return (
     <div className="card">
-      <h2>Registered Students</h2>
-      <div className="student-list">
-        {students.map((student) => (
-          <article key={student.id} className="student-card">
-            <img src={student.imageUrl} alt={`${student.firstName} ${student.secondName}`} />
-            <div>
-              <h3>{student.firstName} {student.secondName}</h3>
-              <p><strong>Admission:</strong> {student.admissionNumber}</p>
-              <p><strong>Email:</strong> {student.email}</p>
-              <p><strong>Course:</strong> {student.course}</p>
-            </div>
-          </article>
-        ))}
+      <div className="list-header">
+        <h2>Registered Students</h2>
+        <input
+          className="search"
+          placeholder="Search by name, admission, course..."
+          value={query}
+          onChange={(e) => setQuery(e.target.value)}
+        />
       </div>
+
+      {filtered.length === 0 ? (
+        <div className="empty">
+          <p>No students found.</p>
+          <Link className="button-link" to="/add-student">Register a student</Link>
+        </div>
+      ) : (
+        <div className="student-list">
+          {filtered.map((student) => (
+            <StudentCard
+              key={student.id}
+              student={student}
+              onDelete={setToDelete}
+            />
+          ))}
+        </div>
+      )}
+
+      <ConfirmModal
+        open={!!toDelete}
+        title="Delete student?"
+        message={
+          toDelete
+            ? `Are you sure you want to delete ${toDelete.firstName} ${toDelete.secondName}? This cannot be undone.`
+            : ''
+        }
+        onCancel={() => setToDelete(null)}
+        onConfirm={handleConfirmDelete}
+      />
     </div>
   )
 }
