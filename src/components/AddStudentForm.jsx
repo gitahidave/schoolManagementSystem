@@ -1,4 +1,6 @@
 import { useState } from 'react'
+import { useNavigate } from 'react-router-dom'
+import { createStudent } from '../api/students'
 
 const initialForm = {
   firstName: '',
@@ -12,6 +14,8 @@ const initialForm = {
 function AddStudentForm() {
   const [formData, setFormData] = useState(initialForm)
   const [status, setStatus] = useState('')
+  const [saving, setSaving] = useState(false)
+  const navigate = useNavigate()
 
   const handleChange = (event) => {
     const { name, value } = event.target
@@ -20,23 +24,18 @@ function AddStudentForm() {
 
   const handleSubmit = async (event) => {
     event.preventDefault()
+    setSaving(true)
     setStatus('Saving student...')
 
     try {
-      const response = await fetch('http://localhost:5000/students', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(formData),
-      })
-
-      if (!response.ok) {
-        throw new Error('Unable to save student')
-      }
-
+      await createStudent(formData)
       setStatus('Student saved successfully!')
       setFormData(initialForm)
+      setTimeout(() => navigate('/students'), 500)
     } catch (error) {
       setStatus(error.message)
+    } finally {
+      setSaving(false)
     }
   }
 
@@ -72,7 +71,9 @@ function AddStudentForm() {
         </label>
       </div>
 
-      <button type="submit">Save Student</button>
+      <button type="submit" disabled={saving}>
+        {saving ? 'Saving...' : 'Save Student'}
+      </button>
       {status ? <p className="status">{status}</p> : null}
     </form>
   )
